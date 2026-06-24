@@ -1,0 +1,36 @@
+services:
+  mcp-client-gateway:
+    build:
+      context: ..
+    image: mcp-client-master-gateway:1.0.0
+    restart: unless-stopped
+    init: true
+    environment:
+      MCP_SERVER_URL: ${MCP_SERVER_URL:-http://host.docker.internal:9200/mcp}
+      MCP_HOST_HEADER: ${MCP_HOST_HEADER:-}
+      GATEWAY_HOST: 0.0.0.0
+      GATEWAY_PORT: 9100
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      MCP_CONNECT_TIMEOUT_SECONDS: ${MCP_CONNECT_TIMEOUT_SECONDS:-5}
+      MCP_REQUEST_TIMEOUT_SECONDS: ${MCP_REQUEST_TIMEOUT_SECONDS:-30}
+      API_KEY: ${API_KEY:?API_KEY must be set}
+      ALLOWED_TOOLS: ${ALLOWED_TOOLS:-simulate_router_path}
+      REQUEST_BODY_LIMIT_BYTES: ${REQUEST_BODY_LIMIT_BYTES:-1048576}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-100}
+      RATE_LIMIT_WINDOW: ${RATE_LIMIT_WINDOW:-1 minute}
+      MCP_MAX_CONCURRENCY: ${MCP_MAX_CONCURRENCY:-20}
+    ports:
+      - "${GATEWAY_PORT:-9100}:9100"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9100/health/live"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s

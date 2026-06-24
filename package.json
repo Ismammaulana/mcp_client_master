@@ -1,0 +1,34 @@
+{
+  "name": "mcp-client-master-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production REST-to-MCP Streamable HTTP gateway",
+  "type": "module",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "vitest run",
+    "test:contract": "RUN_MCP_CONTRACT=1 vitest run test/contract/mcp-transport.test.js test/contract/gateway-network.test.js",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "docs:check": "node scripts/check-docs.js",
+    "check": "npm run lint && npm run docs:check && npm test"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "10.3.0",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "dotenv": "17.2.3",
+    "fastify": "5.8.5",
+    "prom-client": "15.1.3",
+    "undici": "8.5.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.5.0",
+    "vitest": "4.1.9"
+  }
+}

@@ -1,0 +1,27 @@
+[Unit]
+Description=MCP Client Master Gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mcp-gateway
+Group=mcp-gateway
+WorkingDirectory=/opt/CLIENT_MASTER/mcp_client_master_gateway
+EnvironmentFile=/etc/mcp-client-master-gateway.env
+ExecStart=/usr/bin/node /opt/CLIENT_MASTER/mcp_client_master_gateway/src/server.js
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
