@@ -73,9 +73,10 @@ validasi, dan serialisasi.
 
 ### Service layer
 
-`ToolService` menerapkan allowlist sebelum adapter dipanggil, mengubah daftar tool
-ke contract API, menyediakan shortcut `simulate_router_path`, dan memakai result
-parser untuk compatibility.
+`ToolService` menerapkan allowlist sebelum adapter dipanggil, mengubah hasil
+discovery tools/prompts/resources ke contract API, menyediakan shortcut
+`simulate_router_path`, mengeksekusi plan step-by-step via MCP, resolve
+placeholder `result:*`, dan memakai result parser untuk compatibility.
 
 Allowlist berada di service agar tidak dapat dilewati oleh route baru yang memakai
 service yang sama.
@@ -88,18 +89,38 @@ service yang sama.
 2. Membuat `StreamableHTTPClientTransport`.
 3. Membuat MCP `Client`.
 4. Melakukan `connect`, yang mencakup initialize handshake.
-5. Menjalankan `listTools`, `callTool`, atau probe.
+5. Menjalankan `listTools`, `listPrompts`, `listResources`, `readResource`,
+   `getPrompt`, `callTool`, `discoverServer`, atau probe.
 6. Menutup client pada blok `finally`.
 7. Memetakan timeout dan kegagalan upstream ke domain error.
 
-List tools mengikuti pagination sampai `nextCursor` kosong.
+List tools/prompts/resources mengikuti pagination sampai `nextCursor` kosong.
 
-### HTTP transport dan custom Host
+Discovery bootstrap melakukan `GET /health` ke upstream lebih dulu, lalu mencoba
+transport utama `/mcp`. Bila initialize pada jalur utama gagal, adapter mencoba
+fallback `POST /api/mcp` dan `GET /api/mcp/stream?sessionId=<id>`. Strategy yang
+berhasil terakhir diprioritaskan pada operasi berikutnya untuk mengurangi churn.
+Operator juga dapat memaksa `primary` atau `fallback` melalui
+`MCP_TRANSPORT_MODE`.
+
+### HTTP transport, fallback, dan custom Host
 
 Tanpa `MCP_HOST_HEADER`, adapter memakai standard Node `fetch`. Bila
 `MCP_HOST_HEADER` diisi, adapter memakai `undici.request` karena standard fetch
 menghitung ulang header `Host`. Response Undici dibungkus sebagai Web `Response`
 agar sesuai interface transport MCP SDK.
+
+Header auth upstream tambahan berasal dari config operator:
+
+- `MCP_AUTHORIZATION` untuk deployment bearer token atau skema lain pada
+  `Authorization`;
+- `MCP_SECRET_HEADER` + `MCP_SECRET_VALUE` atau alias
+  `MCP_UPSTREAM_SECRET_HEADER` + `MCP_UPSTREAM_SECRET` untuk secret header seperti
+  `x-mcp-secret`.
+
+Pada mode fallback, SDK client tetap memakai `StreamableHTTPClientTransport`, tetapi
+fetch dibungkus agar request `POST/DELETE` diarahkan ke `MCP_FALLBACK_POST_URL`
+sedangkan `GET` SSE diarahkan ke `MCP_FALLBACK_STREAM_URL?sessionId=<id>`.
 
 Perubahan pada jalur ini wajib menjalankan real transport contract test; mock tidak
 dapat membuktikan header benar-benar terkirim.
@@ -122,7 +143,11 @@ total maksimum = jumlah process × MCP_MAX_CONCURRENCY
 
 Metrics hook mencatat active request, total request, dan latency per method/route/
 status. Fastify/Pino menulis JSON log dengan request ID. Header authorization dan
-API key tidak diserialisasi sebagai nilai log.
+API key tidak diserialisasi sebagai nilai log. Execution plan menambah audit log
+per step berisi `planId`, `sessionId`, `page`, `stepIndex`, `tool`, durasi, dan
+status hasil. Gateway juga menulis log lifecycle per route dan debug log adapter/
+service agar investigasi timeout, fallback transport, auth failure, dan shutdown
+lebih mudah tanpa membuka payload mentah.
 
 ## Alur request tool
 

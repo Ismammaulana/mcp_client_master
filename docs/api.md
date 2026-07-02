@@ -32,8 +32,14 @@ content-type: application/json
 | GET | `/health` | Tidak | Tidak | Compatibility health; deprecated |
 | GET | `/health/live` | Tidak | Tidak | Process liveness |
 | GET | `/health/ready` | Ya* | Ya | MCP initialize probe |
+| GET | `/mcp/discovery` | Ya* | Ya | Cek `/health`, initialize, lalu discovery tools/prompts/resources |
 | GET | `/tools` | Ya* | Ya | Daftar seluruh tool, termasuk pagination |
+| GET | `/prompts` | Ya* | Ya | Daftar prompt bila capability tersedia |
+| POST | `/prompts/get` | Ya* | Ya | Ambil prompt tertentu dengan arguments |
+| GET | `/resources` | Ya* | Ya | Daftar resource bila capability tersedia |
+| POST | `/resources/read` | Ya* | Ya | Baca resource tertentu |
 | POST | `/tools/call` | Ya* | Ya | Generic allowed tool call |
+| POST | `/plans/execute` | Ya* | Ya | Eksekusi plan step-by-step via MCP |
 | POST | `/simulate-path` | Ya* | Ya | Shortcut router simulation |
 | GET | `/metrics` | Ya* | Tidak | Prometheus exposition |
 
@@ -119,6 +125,165 @@ Response 200:
 Daftar ini tidak difilter berdasarkan `ALLOWED_TOOLS`. Discovery menunjukkan
 kemampuan upstream, sedangkan execution tetap dibatasi service allowlist.
 
+## GET /mcp/discovery
+
+Endpoint bootstrap untuk caller yang ingin memakai gateway ini sebagai MCP client
+langsung ke upstream master. Urutannya:
+
+1. `GET` ke `MCP_HEALTH_URL`;
+2. initialize MCP via `MCP_SERVER_URL`;
+3. bila initialize gagal pada jalur utama, fallback ke
+   `MCP_FALLBACK_POST_URL` dan `MCP_FALLBACK_STREAM_URL?sessionId=<id>` pada
+   mode `auto`, atau langsung memakai fallback itu pada mode `fallback`;
+4. panggil hanya capability yang diiklankan upstream pada initialize;
+5. ambil `tools/list`, `prompts/list`, dan `resources/list` sesuai capability.
+
+Response 200:
+
+```json
+{
+  "status": "success",
+  "discovery": {
+    "health": {
+      "ok": true,
+      "status": 200,
+      "body": "{\"status\":\"ok\"}"
+    },
+    "transport": {
+      "mode": "primary",
+      "primaryUrl": "http://mcp-server:9200/mcp",
+      "activePostUrl": "http://mcp-server:9200/mcp",
+      "activeStreamUrl": "http://mcp-server:9200/mcp"
+    },
+    "server": {
+      "info": { "name": "master-mcp", "version": "1.0.0" },
+      "instructions": "Use only discovered capabilities.",
+      "capabilities": {
+        "tools": {},
+        "prompts": {},
+        "resources": {}
+      }
+    },
+    "session": {
+      "id": "session-123"
+    },
+    "tools": [],
+    "prompts": [],
+    "resources": []
+  }
+}
+```
+
+Session ID hanya berlaku untuk operasi MCP pada koneksi tersebut. Gateway tetap
+stateless per request; jangan mengasumsikan session reuse antar request REST.
+
+## GET /prompts
+
+Memanggil `prompts/list` hanya bila capability `prompts` diiklankan server. Bila
+server tidak mengiklankan capability ini, response tetap 200 dengan array kosong.
+
+Response 200:
+
+```json
+{
+  "status": "success",
+  "prompts": [
+    {
+      "name": "router-brief",
+      "description": "Build a short router brief",
+      "arguments": [
+        { "name": "topic", "required": true }
+      ]
+    }
+  ]
+}
+```
+
+## POST /prompts/get
+
+Request:
+
+```json
+{
+  "name": "router-brief",
+  "arguments": {
+    "topic": "edge latency"
+  }
+}
+```
+
+Response 200:
+
+```json
+{
+  "status": "success",
+  "prompt_name": "router-brief",
+  "prompt": {
+    "messages": [
+      {
+        "role": "user",
+        "content": {
+          "type": "text",
+          "text": "Create a router brief about edge latency."
+        }
+      }
+    ]
+  }
+}
+```
+
+## GET /resources
+
+Memanggil `resources/list` hanya bila capability `resources` diiklankan server.
+Bila tidak ada capability, response tetap 200 dengan array kosong.
+
+Response 200:
+
+```json
+{
+  "status": "success",
+  "resources": [
+    {
+      "name": "session-context",
+      "uri": "agent://session/session-123/resource/context",
+      "description": "Current session context",
+      "mimeType": "application/json"
+    }
+  ]
+}
+```
+
+Untuk resource kontekstual session, gunakan URI yang memang dikembalikan server
+atau yang dirujuk instruksi upstream, mis. `agent://session/<sessionId>/resource/*`.
+Jangan mengarang URI yang tidak muncul dari discovery atau dokumentasi server.
+
+## POST /resources/read
+
+Request:
+
+```json
+{
+  "uri": "agent://session/session-123/resource/context"
+}
+```
+
+Response 200:
+
+```json
+{
+  "status": "success",
+  "resource": {
+    "contents": [
+      {
+        "uri": "agent://session/session-123/resource/context",
+        "text": "{\"session\":\"session-123\"}",
+        "mimeType": "application/json"
+      }
+    ]
+  }
+}
+```
+
 ## POST /tools/call
 
 Memanggil tool generic. Nama tool harus terdapat pada `ALLOWED_TOOLS`.
@@ -185,6 +350,194 @@ Tool-level error tetap response 200 pada kontrak legacy:
 ```
 
 Consumer wajib memeriksa `ok`, bukan hanya HTTP status atau `status`.
+
+## POST /plans/execute
+
+Menerima plan dari backend web dan menjalankan semua step secara berurutan melalui
+MCP server. Route ini tidak mengeksekusi logic tool lokal. Semua step:
+
+1. divalidasi terhadap `ALLOWED_TOOLS`;
+2. menerima `arguments` yang dapat memakai placeholder `result:<path>`;
+3. dieksekusi satu per satu;
+4. berhenti pada fatal error pertama;
+5. menghasilkan audit log per step pada logger gateway.
+
+MVP whitelist yang diharapkan:
+
+- `activation.get_workspace_context`
+- `activation.create_draft`
+- `device.search`
+- `activation.add_device_to_topology`
+- `topology.add_device`
+- `activation.validate_draft`
+
+Request:
+
+```json
+{
+  "planId": "plan-activation-001",
+  "sessionId": "sess-123",
+  "page": "aktivasi-service",
+  "workspaceId": "ws-123",
+  "tabId": "default",
+  "steps": [
+    {
+      "id": "step-1",
+      "tool": "activation.get_workspace_context",
+      "arguments": {
+        "sessionId": "sess-123",
+        "include": ["workspace", "draft"]
+      }
+    },
+    {
+      "id": "step-2",
+      "tool": "device.search",
+      "arguments": {
+        "query": "router-a"
+      }
+    },
+    {
+      "id": "step-3",
+      "tool": "activation.create_draft",
+      "arguments": {
+        "serviceType": "service",
+        "selectedService": "dia_mix"
+      }
+    },
+    {
+      "id": "step-4",
+      "tool": "activation.add_device_to_topology",
+      "arguments": {
+        "deviceId": "result:device.search.data.data[0].device_id",
+        "role": "intermediate",
+        "position": { "x": 10, "y": 20 }
+      }
+    }
+  ]
+}
+```
+
+Response 200 sukses:
+
+```json
+{
+  "planId": "plan-activation-001",
+  "status": "success",
+  "steps": [
+    {
+      "id": "step-1",
+      "tool": "activation.get_workspace_context",
+      "status": "success",
+      "result": {
+        "tool": "activation.get_workspace_context",
+        "arguments": {
+          "sessionId": "sess-123",
+          "session_id": "sess-123",
+          "include": ["workspace", "draft"],
+          "workspace_id": "ws-123"
+        },
+        "content": [
+          { "type": "text", "text": "workspace loaded" }
+        ],
+        "structured_content": {
+          "workspace_id": "ws-123",
+          "draft_id": "draft-existing"
+        },
+        "parsed_result": {
+          "ok": true,
+          "mode": "structured",
+          "data": {
+            "workspace_id": "ws-123",
+            "draft_id": "draft-existing"
+          }
+        }
+      }
+    },
+    {
+      "id": "step-3",
+      "tool": "activation.create_draft",
+      "status": "success",
+      "result": {
+        "tool": "activation.create_draft",
+        "arguments": {
+          "serviceType": "service",
+          "service_type": "service",
+          "workspace_id": "ws-123",
+          "draft_name": "Draft service 2026-06-29T07:00:00.000Z"
+        },
+        "structured_content": {
+          "draftId": "draft-1"
+        }
+      }
+    }
+  ],
+  "summary": {
+    "message": "Plan executed 4 step(s) successfully"
+  }
+}
+```
+
+Response 200 bila step gagal fatal:
+
+```json
+{
+  "planId": "plan-activation-002",
+  "status": "failed",
+  "steps": [
+    {
+      "tool": "device.search",
+      "status": "failed",
+      "result": {
+        "tool": "activation.create_draft",
+        "arguments": {
+          "workspace_id": "ws-123"
+        },
+        "error": {
+          "code": "PLAN_ARGUMENTS_INVALID",
+          "message": "Step 'activation.create_draft' on page 'aktivasi-service' is missing required arguments after normalization: service_type, draft_name",
+          "fatal": true
+        }
+      }
+    },
+    {
+      "tool": "activation.validate_draft",
+      "status": "skipped",
+      "result": null
+    }
+  ],
+  "summary": {
+    "message": "Plan stopped at step 1 because PLAN_ARGUMENTS_INVALID"
+  }
+}
+```
+
+Catatan:
+
+- Placeholder hanya dapat merujuk hasil step yang sudah selesai.
+- Namespace placeholder mengikuti nama tool dan shape output live, mis.
+  `result:device.search.data.data[0].device_id`.
+- Untuk `page: "aktivasi-service"`, gateway menambahkan `workspace_id` dari
+  `workspaceId` request bila step activation/device/topology belum mengisinya
+  dan meneruskan `tabId` plan-level ke step activation bila caller mengirimnya.
+- Untuk `activation.create_draft`, gateway membuat `draft_name` default
+  `Draft <service_type> <timestamp>` bila `service_type` ada tetapi `draft_name`
+  belum dikirim, dan meneruskan `selectedService` serta `tabId` bila caller
+  mengisinya.
+- Untuk `activation.add_device_to_topology`, `topology.add_device`, dan
+  `activation.validate_draft`, gateway mencoba mengisi `draft_id` dari hasil
+  `activation.create_draft` atau `activation.get_workspace_context` bila ada,
+  tetapi tidak lagi memblokir step jika nilai itu kosong. Bila upstream
+  `create_draft` tidak mengembalikan id yang bisa dipakai, gateway memakai
+  nilai kompatibilitas internal agar placeholder plan tetap bisa lanjut.
+- Bila `activation.add_device_to_topology` diminta tetapi runtime allowlist hanya
+  memuat `topology.add_device`, gateway memakai alias legacy itu sebagai fallback
+  execution tool agar contract plan baru tetap dapat dieksekusi.
+- Alias camelCase seperti `workspaceId`, `sessionId`, `serviceType`, `draftName`,
+  dan `deviceId` tetap diterima untuk kompatibilitas plan lama pada page ini.
+- Bila placeholder tidak dapat di-resolve, step gagal dengan code
+  `PLACEHOLDER_RESOLUTION_FAILED`.
+- Bila required argument masih kurang setelah normalisasi, step gagal lokal di
+  gateway dengan code `PLAN_ARGUMENTS_INVALID` dan MCP server tidak dipanggil.
 
 ## POST /simulate-path
 

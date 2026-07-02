@@ -6,7 +6,16 @@ const integerFromEnv = (minimum, maximum) =>
 
 const environmentSchema = z.object({
   MCP_SERVER_URL: z.url().default("http://localhost:9200/mcp"),
+  MCP_HEALTH_URL: z.url().optional(),
+  MCP_FALLBACK_POST_URL: z.url().optional(),
+  MCP_FALLBACK_STREAM_URL: z.url().optional(),
+  MCP_TRANSPORT_MODE: z.enum(["auto", "primary", "fallback"]).default("auto"),
   MCP_HOST_HEADER: z.string().optional().default(""),
+  MCP_AUTHORIZATION: z.string().optional().default(""),
+  MCP_SECRET_HEADER: z.string().min(1).optional().default("x-mcp-secret"),
+  MCP_SECRET_VALUE: z.string().optional().default(""),
+  MCP_UPSTREAM_SECRET_HEADER: z.string().min(1).optional().default(""),
+  MCP_UPSTREAM_SECRET: z.string().optional().default(""),
   GATEWAY_HOST: z.string().min(1).default("0.0.0.0"),
   GATEWAY_PORT: integerFromEnv(1, 65535).default(9100),
   LOG_LEVEL: z
@@ -15,7 +24,11 @@ const environmentSchema = z.object({
   MCP_CONNECT_TIMEOUT_SECONDS: integerFromEnv(1, 300).default(5),
   MCP_REQUEST_TIMEOUT_SECONDS: integerFromEnv(1, 3600).default(30),
   API_KEY: z.string().optional().default(""),
-  ALLOWED_TOOLS: z.string().default("simulate_router_path"),
+  ALLOWED_TOOLS: z
+    .string()
+    .default(
+      "simulate_router_path,activation.get_workspace_context,activation.create_draft,device.search,activation.add_device_to_topology,topology.add_device,activation.validate_draft",
+    ),
   REQUEST_BODY_LIMIT_BYTES: integerFromEnv(1024, 10 * 1024 * 1024).default(
     1024 * 1024,
   ),
@@ -34,6 +47,8 @@ export function loadConfig(environment = process.env) {
   }
 
   const env = parsed.data;
+  const primaryUrl = new URL(env.MCP_SERVER_URL);
+  const deriveUpstreamUrl = (pathname) => new URL(pathname, primaryUrl).toString();
   const allowedTools = new Set(
     env.ALLOWED_TOOLS.split(",")
       .map((name) => name.trim())
@@ -46,7 +61,17 @@ export function loadConfig(environment = process.env) {
 
   return Object.freeze({
     mcpServerUrl: env.MCP_SERVER_URL,
+    mcpHealthUrl: env.MCP_HEALTH_URL || deriveUpstreamUrl("/health"),
+    mcpFallbackPostUrl: env.MCP_FALLBACK_POST_URL || deriveUpstreamUrl("/api/mcp"),
+    mcpFallbackStreamUrl:
+      env.MCP_FALLBACK_STREAM_URL || deriveUpstreamUrl("/api/mcp/stream"),
+    mcpTransportMode: env.MCP_TRANSPORT_MODE,
     mcpHostHeader: env.MCP_HOST_HEADER || null,
+    mcpAuthorization: env.MCP_AUTHORIZATION || null,
+    mcpSecretHeader:
+      env.MCP_UPSTREAM_SECRET_HEADER ||
+      env.MCP_SECRET_HEADER,
+    mcpSecretValue: env.MCP_UPSTREAM_SECRET || env.MCP_SECRET_VALUE || null,
     gatewayHost: env.GATEWAY_HOST,
     gatewayPort: env.GATEWAY_PORT,
     logLevel: env.LOG_LEVEL,

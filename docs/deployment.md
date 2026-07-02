@@ -101,6 +101,7 @@ sudo install -m 0644 deploy/mcp-client-master-gateway.service \
   /etc/systemd/system/mcp-client-master-gateway.service
 sudo install -m 0640 -o root -g mcp-gateway /secure/path/mcp-gateway.env \
   /etc/mcp-client-master-gateway.env
+sudo test -x /usr/bin/node
 ```
 
 Install dependency production:
@@ -121,7 +122,16 @@ journalctl -u mcp-client-master-gateway -f
 ```
 
 Unit menerapkan `NoNewPrivileges`, private tmp, read-only system protection, kernel
-protection, restart-on-failure, dan SIGTERM stop.
+protection, capability drop, `ProtectProc`, address-family restriction,
+restart-on-failure, dan SIGTERM stop.
+
+Jangan arahkan `ExecStart` ke binary NVM dalam home directory operator. Pada host
+yang sebelumnya memakai NVM root, migrasikan ke Node system-wide seperti
+`/usr/bin/node` agar service dapat berjalan sebagai user dedicated tanpa
+menonaktifkan `ProtectHome`.
+
+`RestrictAddressFamilies` tetap mengizinkan `AF_NETLINK` karena Fastify/Node
+memakai enumerasi interface jaringan saat menulis log alamat listen pada startup.
 
 ## Reverse proxy
 

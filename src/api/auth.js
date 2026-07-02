@@ -19,6 +19,14 @@ export function createAuthenticate(config) {
     const rawHeader = request.headers["x-api-key"];
     const candidate = Array.isArray(rawHeader) ? rawHeader[0] : rawHeader;
     if (typeof candidate !== "string" || !safeEqual(candidate, config.apiKey)) {
+      request.log?.warn(
+        {
+          requestId: request.id,
+          method: request.method,
+          url: request.url,
+        },
+        "Request authentication failed",
+      );
       throw new UnauthorizedError();
     }
   };

@@ -39,12 +39,40 @@ Gunakan `reqId`/`x-request-id` untuk korelasi caller, gateway log, dan incident.
 Jangan mencatat body generic tool call secara default karena dapat mengandung data
 sensitif. Header API key dan authorization harus selalu direduksi/tidak diserialisasi.
 
+Gateway menulis log proses tambahan pada level `info` dan `debug`:
+
+- `HTTP request completed` untuk semua request dengan `method`, `route`,
+  `statusCode`, dan `durationMs`.
+- `MCP discovery request started/completed`, `Tool list request started/completed`,
+  `Prompt list request started/completed`, `Resource list request started/completed`,
+  `Prompt retrieval request started/completed`, `Resource read request started/completed`,
+  `Tool call request started/completed`, `Plan execution request started/completed`,
+  dan `Path simulation request started/completed`.
+- `Readiness probe started/completed` pada `/health/ready`.
+- `Gateway bootstrap starting` dan `Gateway listening` saat startup.
+- `McpClientAdapter.*` pada level `debug` untuk startup operasi, strategi transport,
+  connect/close, health check, dan hasil operasi upstream.
+- `ToolService.*` pada level `debug` untuk start/completion use case internal.
+
+`POST /plans/execute` menulis audit log per step dengan field:
+
+- `planId`
+- `sessionId`
+- `page`
+- `stepIndex`
+- `stepId`
+- `tool`
+- `normalizedArguments`
+- `durationMs`
+- `status`
+- `errorCode` saat gagal
+
 Level:
 
-- `info`: request lifecycle dan startup/shutdown.
-- `warn`: MCP operation failure yang dipetakan.
+- `info`: request lifecycle, route lifecycle, plan lifecycle, startup/shutdown, dan readiness.
+- `warn`: auth failure, MCP operation failure yang dipetakan, dan health probe gagal.
 - `error`: internal/unhandled error atau shutdown failure.
-- `debug`: close cleanup failure dan diagnosis development.
+- `debug`: request received, transport selection, connect/close cleanup, dan diagnosis development.
 
 ## Metrics
 

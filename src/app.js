@@ -32,11 +32,39 @@ export async function createApp(config, dependencies = {}) {
         : randomUUID();
     },
   });
+  app.addHook("onRequest", async (request) => {
+    request.gatewayStartedAt = process.hrtime.bigint();
+    request.log?.debug(
+      {
+        requestId: request.id,
+        method: request.method,
+        url: request.url,
+      },
+      "HTTP request received",
+    );
+  });
+  app.addHook("onResponse", async (request, reply) => {
+    const startedAt = request.gatewayStartedAt;
+    const durationMs = startedAt
+      ? Number(process.hrtime.bigint() - startedAt) / 1e6
+      : null;
+    request.log?.info(
+      {
+        requestId: request.id,
+        method: request.method,
+        route: request.routeOptions?.url ?? request.url,
+        statusCode: reply.statusCode,
+        durationMs,
+      },
+      "HTTP request completed",
+    );
+  });
 
   const mcpClient =
     dependencies.mcpClient ?? new McpClientAdapter(config, { logger: app.log });
   const toolService =
-    dependencies.toolService ?? new ToolService(mcpClient, config.allowedTools);
+    dependencies.toolService ??
+    new ToolService(mcpClient, config.allowedTools, { logger: app.log });
   const authenticate = createAuthenticate(config);
   const metrics = dependencies.metrics ?? createMetrics();
 

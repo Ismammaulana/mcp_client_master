@@ -41,7 +41,15 @@ network. OAuth2/JWT/mTLS memerlukan desain dan ADR baru.
 ### Authorization
 
 `ALLOWED_TOOLS` adalah exact-name allowlist. `ToolService.assertAllowed` berjalan
-sebelum MCP adapter. Default hanya `simulate_router_path`.
+sebelum MCP adapter. Default mencakup `simulate_router_path` dan whitelist MVP
+activation service:
+
+- `activation.get_workspace_context`
+- `activation.create_draft`
+- `device.search`
+- `activation.add_device_to_topology`
+- `topology.add_device`
+- `activation.validate_draft`
 
 `GET /tools` tetap menampilkan seluruh tool upstream. Jangan menganggap discovery
 response sebagai authorization grant.
@@ -60,6 +68,10 @@ response sebagai authorization grant.
 - Header API key/authorization direduksi/tidak diserialisasi pada log.
 - Metric label tidak memasukkan user input.
 - `.env` dan log di-ignore.
+- Secret upstream pada `MCP_AUTHORIZATION` atau `MCP_SECRET_VALUE` hanya berasal
+  dari config operator dan tidak pernah dimasukkan ke response REST.
+- Alias runtime `MCP_UPSTREAM_SECRET_HEADER` dan `MCP_UPSTREAM_SECRET` diperlakukan
+  sama dan tidak boleh berasal dari request caller.
 
 Risiko tersisa: `/health` dan `/simulate-path` compatibility response mengekspos
 MCP URL, sedangkan `/health` tidak memakai auth. Batasi di reverse proxy atau
@@ -70,6 +82,17 @@ migrasikan consumer ke endpoint production sebelum menghapusnya.
 `MCP_HOST_HEADER` hanya berasal dari operator config dan diteruskan melalui Undici.
 Jangan mengambil Host override dari request caller; hal tersebut dapat membuka SSRF,
 virtual-host confusion, atau routing ke tenant yang salah.
+
+### Upstream auth headers
+
+Gateway dapat meneruskan kredensial ke MCP upstream melalui `MCP_AUTHORIZATION`
+atau kombinasi `MCP_SECRET_HEADER`/`MCP_SECRET_VALUE` maupun alias
+`MCP_UPSTREAM_SECRET_HEADER`/`MCP_UPSTREAM_SECRET`. Nilai ini:
+
+- tidak boleh berasal dari request caller;
+- tidak boleh dicatat ke log, metric, atau response;
+- harus diperlakukan sebagai secret deployment dan dikelola via secret manager atau
+  environment file yang terlindungi.
 
 ## Threat model ringkas
 
@@ -89,6 +112,9 @@ virtual-host confusion, atau routing ke tenant yang salah.
 
 - Jangan commit `.env`.
 - Permission environment file systemd maksimum `0640`, owner root, group service.
+- Service systemd harus berjalan sebagai user dedicated non-login, bukan `root`.
+- Binary runtime production harus berada di path system-wide seperti `/usr/bin/node`,
+  bukan di home directory operator seperti NVM root.
 - Gunakan Docker/Kubernetes secret atau platform secret manager.
 - Rotasi dilakukan dengan update secret dan rolling restart; koordinasikan caller.
 - Jangan mengirim API key melalui query string.
