@@ -57,8 +57,12 @@ npm test
 npm start
 ```
 
-Ubah `API_KEY` di `.env`. Bila `API_KEY` kosong, autentikasi dimatikan untuk
-development/kompatibilitas lokal. Jangan gunakan nilai kosong pada production.
+Default `.env.example` local mengarah ke MCP server lokal di
+`http://127.0.0.1:9200/mcp` dan membuka gateway di `http://127.0.0.1:9110`.
+
+Pastikan `API_KEY` sama dengan `MCP_GATEWAY_API_KEY` di `agent-ai-master/.env`.
+Bila `API_KEY` kosong, autentikasi dimatikan untuk development/kompatibilitas
+lokal. Jangan gunakan nilai kosong pada production.
 
 ## Konfigurasi
 
@@ -76,7 +80,7 @@ development/kompatibilitas lokal. Jangan gunakan nilai kosong pada production.
 | `MCP_UPSTREAM_SECRET_HEADER` | kosong | Alias runtime untuk `MCP_SECRET_HEADER` bila deployment memakai nama baru |
 | `MCP_UPSTREAM_SECRET` | kosong | Alias runtime untuk `MCP_SECRET_VALUE` |
 | `GATEWAY_HOST` | `0.0.0.0` | Bind host |
-| `GATEWAY_PORT` | `9100` | Bind port |
+| `GATEWAY_PORT` | `9100` | Bind port default; `.env.example` local memakai `9110` agar sama dengan wrapper |
 | `LOG_LEVEL` | `info` | Level Pino/Fastify |
 | `MCP_CONNECT_TIMEOUT_SECONDS` | `5` | Timeout handshake |
 | `MCP_REQUEST_TIMEOUT_SECONDS` | `30` | Timeout operasi MCP |
