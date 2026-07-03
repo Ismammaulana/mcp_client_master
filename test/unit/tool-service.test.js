@@ -143,7 +143,7 @@ describe("ToolService", () => {
           tool: "activation.add_device_to_topology",
           arguments: {
             device_id: "result:device.search.data.data[0].device_id",
-            role: "intermediate",
+            role: "PE",
             position: { x: 10, y: 20 },
           },
         },
@@ -211,7 +211,7 @@ describe("ToolService", () => {
         workspace_id: "ws-1",
         draft_id: "draft-44",
         device_id: "12567",
-        role: "intermediate",
+        role: "PE",
         position: { x: 10, y: 20 },
       },
     );
@@ -314,7 +314,7 @@ describe("ToolService", () => {
           tool: "activation.add_device_to_topology",
           arguments: {
             device_id: "dev-9",
-            role: "intermediate",
+            role: "PE",
             position: { x: 10, y: 20 },
           },
         },
@@ -328,7 +328,7 @@ describe("ToolService", () => {
         workspace_id: "ws-1",
         draft_id: "draft-44",
         device_id: "dev-9",
-        role: "intermediate",
+        role: "PE",
         position: { x: 10, y: 20 },
       },
     );

@@ -266,7 +266,7 @@ describe("gateway API", () => {
             tool: "activation.add_device_to_topology",
             arguments: {
               device_id: "result:device.search.data.data[0].device_id",
-              role: "intermediate",
+              role: "PE",
               position: { x: 1, y: 2 },
             },
           },
@@ -384,7 +384,7 @@ describe("gateway API", () => {
             tool: "activation.add_device_to_topology",
             arguments: {
               device_id: "result:device.search.data.data[0].device_id",
-              role: "intermediate",
+              role: "PE",
               position: { x: 480, y: 220 },
             },
           },
