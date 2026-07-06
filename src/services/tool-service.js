@@ -4,13 +4,16 @@ import { parseCallToolResult } from "../domain/result-parser.js";
 const ACTIVATION_PAGE = "aktivasi-service";
 const ADD_DEVICE_TOOL_ALIAS = "activation.add_device_to_topology";
 const LEGACY_ADD_DEVICE_TOOL = "topology.add_device";
+const CONFIGURE_DEVICE_TOOL = "activation.configure_device";
 const ACTIVATION_PLAN_TOOLS = new Set([
   "activation.get_workspace_context",
   "activation.create_draft",
   "device.search",
   ADD_DEVICE_TOOL_ALIAS,
   LEGACY_ADD_DEVICE_TOOL,
+  CONFIGURE_DEVICE_TOOL,
   "activation.validate_draft",
+  "activation.verify_schema",
 ]);
 const REQUIRED_PLAN_ARGUMENTS = new Map([
   ["activation.get_workspace_context", ["workspace_id"]],
@@ -18,7 +21,9 @@ const REQUIRED_PLAN_ARGUMENTS = new Map([
   ["device.search", ["workspace_id", "query"]],
   [ADD_DEVICE_TOOL_ALIAS, ["workspace_id", "device_id", "role", "position"]],
   [LEGACY_ADD_DEVICE_TOOL, ["workspace_id", "device_id", "role", "position"]],
+  [CONFIGURE_DEVICE_TOOL, ["workspace_id", "config"]],
   ["activation.validate_draft", ["workspace_id"]],
+  ["activation.verify_schema", ["workspace_id"]],
 ]);
 const ACTIVATION_ARGUMENT_ALIASES = new Map([
   ["workspaceId", "workspace_id"],
@@ -305,7 +310,9 @@ function normalizePlanArguments(plan, step, resolvedArguments, resultsByTool) {
   if (
     (step.tool === ADD_DEVICE_TOOL_ALIAS ||
       step.tool === LEGACY_ADD_DEVICE_TOOL ||
-      step.tool === "activation.validate_draft") &&
+      step.tool === CONFIGURE_DEVICE_TOOL ||
+      step.tool === "activation.validate_draft" ||
+      step.tool === "activation.verify_schema") &&
     !hasMeaningfulValue(normalizedArguments.draft_id)
   ) {
     const draftId = resolveDraftIdFromResults(resultsByTool);

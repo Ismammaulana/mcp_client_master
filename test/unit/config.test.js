@@ -16,9 +16,12 @@ describe("loadConfig", () => {
       "activation.get_workspace_context",
       "activation.create_draft",
       "device.search",
+      "device.get_ports",
       "activation.add_device_to_topology",
       "topology.add_device",
+      "activation.configure_device",
       "activation.validate_draft",
+      "activation.verify_schema",
     ]);
   });
 
