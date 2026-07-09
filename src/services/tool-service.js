@@ -14,6 +14,7 @@ const ACTIVATION_PLAN_TOOLS = new Set([
   CONFIGURE_DEVICE_TOOL,
   "activation.validate_draft",
   "activation.verify_schema",
+  "activation.execute_schema",
 ]);
 const REQUIRED_PLAN_ARGUMENTS = new Map([
   ["activation.get_workspace_context", ["workspace_id"]],
@@ -24,6 +25,7 @@ const REQUIRED_PLAN_ARGUMENTS = new Map([
   [CONFIGURE_DEVICE_TOOL, ["workspace_id", "config"]],
   ["activation.validate_draft", ["workspace_id"]],
   ["activation.verify_schema", ["workspace_id"]],
+  ["activation.execute_schema", ["workspace_id"]],
 ]);
 const ACTIVATION_ARGUMENT_ALIASES = new Map([
   ["workspaceId", "workspace_id"],
@@ -312,7 +314,8 @@ function normalizePlanArguments(plan, step, resolvedArguments, resultsByTool) {
       step.tool === LEGACY_ADD_DEVICE_TOOL ||
       step.tool === CONFIGURE_DEVICE_TOOL ||
       step.tool === "activation.validate_draft" ||
-      step.tool === "activation.verify_schema") &&
+      step.tool === "activation.verify_schema" ||
+      step.tool === "activation.execute_schema") &&
     !hasMeaningfulValue(normalizedArguments.draft_id)
   ) {
     const draftId = resolveDraftIdFromResults(resultsByTool);
