@@ -27,7 +27,7 @@ const environmentSchema = z.object({
   ALLOWED_TOOLS: z
     .string()
     .default(
-      "simulate_router_path,activation.get_workspace_context,activation.create_draft,device.search,device.get_ports,activation.add_device_to_topology,topology.add_device,activation.configure_device,activation.validate_draft,activation.verify_schema,activation.execute_schema",
+      "simulate_router_path,activation.get_workspace_context,activation.create_draft,activation.import_ewo_schema,device.search,device.get_ports,activation.add_device_to_topology,topology.add_device,activation.configure_device,activation.validate_draft,activation.verify_schema,activation.execute_schema",
     ),
   REQUEST_BODY_LIMIT_BYTES: integerFromEnv(1024, 10 * 1024 * 1024).default(
     1024 * 1024,

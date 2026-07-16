@@ -8,6 +8,7 @@ const CONFIGURE_DEVICE_TOOL = "activation.configure_device";
 const ACTIVATION_PLAN_TOOLS = new Set([
   "activation.get_workspace_context",
   "activation.create_draft",
+  "activation.import_ewo_schema",
   "device.search",
   ADD_DEVICE_TOOL_ALIAS,
   LEGACY_ADD_DEVICE_TOOL,
@@ -19,6 +20,7 @@ const ACTIVATION_PLAN_TOOLS = new Set([
 const REQUIRED_PLAN_ARGUMENTS = new Map([
   ["activation.get_workspace_context", ["workspace_id"]],
   ["activation.create_draft", ["workspace_id", "service_type", "draft_name"]],
+  ["activation.import_ewo_schema", ["workspace_id", "ewo_number"]],
   ["device.search", ["workspace_id", "query"]],
   [ADD_DEVICE_TOOL_ALIAS, ["workspace_id", "device_id", "role", "position"]],
   [LEGACY_ADD_DEVICE_TOOL, ["workspace_id", "device_id", "role", "position"]],
@@ -38,6 +40,8 @@ const ACTIVATION_ARGUMENT_ALIASES = new Map([
   ["requestId", "request_id"],
   ["topologyId", "topology_id"],
   ["parentDeviceId", "parent_device_id"],
+  ["ewoNumber", "ewo_number"],
+  ["selectedService", "selected_service"],
 ]);
 
 function setNestedResult(target, toolName, value) {
@@ -313,6 +317,7 @@ function normalizePlanArguments(plan, step, resolvedArguments, resultsByTool) {
     (step.tool === ADD_DEVICE_TOOL_ALIAS ||
       step.tool === LEGACY_ADD_DEVICE_TOOL ||
       step.tool === CONFIGURE_DEVICE_TOOL ||
+      step.tool === "activation.import_ewo_schema" ||
       step.tool === "activation.validate_draft" ||
       step.tool === "activation.verify_schema" ||
       step.tool === "activation.execute_schema") &&

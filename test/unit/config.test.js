@@ -15,6 +15,7 @@ describe("loadConfig", () => {
       "simulate_router_path",
       "activation.get_workspace_context",
       "activation.create_draft",
+      "activation.import_ewo_schema",
       "device.search",
       "device.get_ports",
       "activation.add_device_to_topology",
@@ -22,6 +23,7 @@ describe("loadConfig", () => {
       "activation.configure_device",
       "activation.validate_draft",
       "activation.verify_schema",
+      "activation.execute_schema",
     ]);
   });
 

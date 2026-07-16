@@ -273,6 +273,47 @@ describe("ToolService", () => {
     );
   });
 
+  it("normalizes import EWO aliases before calling MCP", async () => {
+    const mcpClient = {
+      callTool: vi.fn().mockResolvedValue({
+        isError: false,
+        structuredContent: { schemaId: "139" },
+      }),
+    };
+    const service = new ToolService(
+      mcpClient,
+      new Set(["activation.import_ewo_schema"]),
+    );
+
+    const result = await service.executePlan({
+      planId: "plan-import-ewo",
+      sessionId: "session-1",
+      page: "aktivasi-service",
+      workspaceId: "ws-1",
+      tabId: "tab-1",
+      steps: [
+        {
+          tool: "activation.import_ewo_schema",
+          arguments: {
+            ewoNumber: "20260718119",
+            selectedService: "dia_mix",
+          },
+        },
+      ],
+    });
+
+    expect(result.status).toBe("success");
+    expect(mcpClient.callTool).toHaveBeenCalledWith(
+      "activation.import_ewo_schema",
+      expect.objectContaining({
+        workspace_id: "ws-1",
+        tab_id: "tab-1",
+        ewo_number: "20260718119",
+        selected_service: "dia_mix",
+      }),
+    );
+  });
+
   it("maps activation add-device tool to legacy topology.add_device when only legacy name is allowed", async () => {
     const mcpClient = {
       callTool: vi

@@ -7,6 +7,12 @@ import {
 } from "../domain/errors.js";
 import { ConcurrencyGate } from "./concurrency-gate.js";
 
+const LONG_RUNNING_TOOL_MIN_TIMEOUT_MS = 120_000;
+const LONG_RUNNING_TOOLS = new Set([
+  "activation.verify_schema",
+  "activation.execute_schema",
+]);
+
 function isTimeoutError(error) {
   return (
     error?.name === "AbortError" ||
@@ -240,11 +246,16 @@ export class McpClientAdapter {
       toolName: name,
       argumentKeys: Object.keys(args ?? {}),
     });
+    // Verifikasi dan eksekusi perangkat dapat melewati timeout umum tanpa berarti upstream macet.
+    const requestTimeoutMs = LONG_RUNNING_TOOLS.has(name)
+      ? Math.max(this.config.mcpRequestTimeoutMs, LONG_RUNNING_TOOL_MIN_TIMEOUT_MS)
+      : this.config.mcpRequestTimeoutMs;
     const result = await this.gate.run(() =>
       this.#withClient("callTool", (client) =>
         client.callTool({ name, arguments: args }, undefined, {
-          timeout: this.config.mcpRequestTimeoutMs,
+          timeout: requestTimeoutMs,
         }),
+        requestTimeoutMs,
       ),
     );
     logAdapterEvent(this.logger, "debug", "McpClientAdapter.callTool completed", {
@@ -318,7 +329,7 @@ export class McpClientAdapter {
     return discovery;
   }
 
-  async #withClient(operationName, operation) {
+  async #withClient(operationName, operation, requestTimeoutMs = this.config.mcpRequestTimeoutMs) {
     const strategies = await this.#resolveTransportStrategies();
     const failures = [];
     logAdapterEvent(this.logger, "debug", "MCP client operation started", {
@@ -332,6 +343,7 @@ export class McpClientAdapter {
           operationName,
           strategy,
           operation,
+          requestTimeoutMs,
         );
         logAdapterEvent(this.logger, "debug", "MCP client operation completed", {
           operationName,
@@ -356,7 +368,7 @@ export class McpClientAdapter {
     throw this.#mapError(failures.at(-1));
   }
 
-  async #withClientStrategy(operationName, strategy, operation) {
+  async #withClientStrategy(operationName, strategy, operation, requestTimeoutMs) {
     let timeout = this.config.mcpConnectTimeoutMs;
     const transport = new StreamableHTTPClientTransport(
       new URL(strategy.transportUrl),
@@ -375,7 +387,7 @@ export class McpClientAdapter {
       await client.connect(transport, {
         timeout: this.config.mcpConnectTimeoutMs,
       });
-      timeout = this.config.mcpRequestTimeoutMs;
+      timeout = requestTimeoutMs;
       this.lastSuccessfulStrategyKind = strategy.kind;
       logAdapterEvent(this.logger, "debug", "MCP client connect completed", {
         operationName,
